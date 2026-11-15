@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Punjab Mandi | Price Forecasting</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">PM</div>
+        <div><strong>Punjab Mandi</strong><span>PRICE INTELLIGENCE</span></div>
+      </div>
+      <div class="side-label">WORKSPACE</div>
+      <a class="nav-item active" href="#overview">▦ <span>Dashboard</span></a>
+      <a class="nav-item" href="#forecast-panel">↗ <span>Price Forecast</span></a>
+      <a class="nav-item" href="#single-panel">◎ <span>Single Prediction</span></a>
+      <a class="nav-item" href="#model-report">▤ <span>Model Report</span></a>
+      <div class="sidebar-bottom">
+        <div class="status-dot"></div>
+        <div><b>Model connected</b><small>model.pkl loaded</small></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">PUNJAB AGRICULTURE ANALYTICS</div>
+          <h1>Market Forecast Dashboard</h1>
+          <p>Commodity price insights and machine-learning forecasts.</p>
+        </div>
+        <div class="top-pill"><span></span> SYSTEM ONLINE</div>
+      </header>
+
+      <section class="stats-grid" id="overview">
+        <div class="stat-card"><div class="stat-top"><span>Dataset records</span><span class="stat-icon">▤</span></div><strong>{{ total_records }}</strong><small>Processed mandi observations</small></div>
+        <div class="stat-card"><div class="stat-top"><span>Commodities</span><span class="stat-icon">◈</span></div><strong>{{ commodity_count }}</strong><small>Available in dataset</small></div>
+        <div class="stat-card"><div class="stat-top"><span>Markets</span><span class="stat-icon">⌖</span></div><strong>{{ market_count }}</strong><small>Available in dataset</small></div>
+        <div class="stat-card"><div class="stat-top"><span>Latest data date</span><span class="stat-icon">◷</span></div><strong class="date-stat">{{ latest_date }}</strong><small>Most recent dataset date</small></div>
+      </section>
+
+      {% if error %}
+      <div class="alert">⚠ {{ error }}</div>
+      {% endif %}
+
+      <section class="workspace-grid">
+        <div class="panel forecast-panel" id="forecast-panel">
+          <div class="panel-heading">
+            <div><div class="eyebrow">MULTI-DAY ANALYSIS</div><h2>Price Forecast</h2><p>Choose a commodity, market and forecast period.</p></div>
+            <div class="panel-symbol">↗</div>
+          </div>
+          <form method="POST" class="form-grid">
+            <input type="hidden" name="action" value="forecast">
+            <label>Commodity
+              <select name="commodity" required>
+                {% for item in commodities %}<option value="{{ item }}" {% if item == default_commodity %}selected{% endif %}>{{ item }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Market
+              <select name="market" required>
+                {% for item in markets %}<option value="{{ item }}" {% if item == default_market %}selected{% endif %}>{{ item }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Last available data date<input type="date" name="last_data_date" required></label>
+            <label>Forecast start date<input type="date" name="start_date" required></label>
+            <label class="full">Forecast end date<input type="date" name="end_date" required></label>
+            <button class="primary-btn full" type="submit">Generate forecast <span>→</span></button>
+          </form>
+        </div>
+
+        <div class="panel single-panel" id="single-panel">
+          <div class="panel-heading">
+            <div><div class="eyebrow">QUICK ESTIMATE</div><h2>Single Prediction</h2><p>Predict the price for one future date.</p></div>
+            <div class="panel-symbol purple">◎</div>
+          </div>
+          <form method="POST" class="form-grid">
+            <input type="hidden" name="action" value="single">
+            <label>Commodity
+              <select name="single_commodity" required>
+                {% for item in commodities %}<option value="{{ item }}" {% if item == default_commodity %}selected{% endif %}>{{ item }}</option>{% endfor %}
+              </select>
+            </label>
+            <label>Market
+              <select name="single_market" required>
+                {% for item in markets %}<option value="{{ item }}" {% if item == default_market %}selected{% endif %}>{{ item }}</option>{% endfor %}
+              </select>
+            </label>
+            <label class="full">Prediction date<input type="date" name="prediction_date" required></label>
+            <button class="secondary-btn full" type="submit">Predict price <span>→</span></button>
+          </form>
+          <div class="helper-note">Uses the latest available history for the selected commodity and market.</div>
+        </div>
+      </section>
+
+      {% if forecast_rows %}
+      <section class="panel results-panel">
+        <div class="panel-heading result-heading">
+          <div><div class="eyebrow">MODEL OUTPUT</div><h2>Forecast results</h2><p>{{ forecast_rows|length }} daily prediction(s) generated.</p></div>
+          <span class="result-tag">SUCCESS</span>
+        </div>
+        <div class="chart-wrap"><canvas id="forecastChart"></canvas></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Date</th><th>Commodity</th><th>Market</th><th>Season</th><th>Predicted modal price</th></tr></thead>
+          <tbody>{% for row in forecast_rows %}<tr><td>{{ row.forecast_date }}</td><td>{{ row.commodity }}</td><td>{{ row.market }}</td><td>{{ row.season }}</td><td class="price">₹{{ "{:,.2f}".format(row.pred_price) }}</td></tr>{% endfor %}</tbody></table>
+        </div>
+      </section>
+      {% endif %}
+
+      {% if single_result %}
+      <section class="panel single-result">
+        <div class="eyebrow">SINGLE-DATE PREDICTION</div>
+        <h2>{{ single_result.commodity }} · {{ single_result.market }}</h2>
+        <div class="big-price">₹{{ "{:,.2f}".format(single_result.pred_price) }}<small> / quintal</small></div>
+        <p>{{ single_result.forecast_date }} · {{ single_result.season }}</p>
+        <div class="price-per-kg">Approx. ₹{{ "{:,.2f}".format(single_result.pred_price / 100) }} per kg</div>
+      </section>
+      {% endif %}
+
+      <section class="panel report-panel" id="model-report">
+        <div class="panel-heading">
+          <div><div class="eyebrow">MODEL PERFORMANCE</div><h2>Evaluation report</h2><p>Metrics supplied for the trained forecasting model.</p></div>
+          <div class="r2-chip"><strong>96.89%</strong><small>R² score</small></div>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric"><span>Mean Squared Error</span><strong>260,489.29</strong><small>MSE</small></div>
+          <div class="metric"><span>Mean Absolute Error</span><strong>₹259.48</strong><small>MAE / quintal</small></div>
+          <div class="metric"><span>Root Mean Squared Error</span><strong>₹510.38</strong><small>RMSE / quintal</small></div>
+          <div class="metric"><span>R² Score</span><strong>0.9689</strong><small>Coefficient of determination</small></div>
+        </div>
+        <div class="report-note">Note: These are the evaluation metrics provided for your model. Confirm they were calculated on a time-based holdout set that was not used for training.</div>
+      </section>
+
+      <footer>Punjab Mandi Price Forecasting <span>Machine Learning Dashboard · Flask</span></footer>
+    </main>
+  </div>
+
+  {% if forecast_rows %}
+  <script>
+    const forecastLabels = {{ forecast_rows | map(attribute='forecast_date') | list | tojson }};
+    const forecastValues = {{ forecast_rows | map(attribute='pred_price') | list | tojson }};
+    new Chart(document.getElementById('forecastChart'), {
+      type: 'line',
+      data: { labels: forecastLabels, datasets: [{
+        label: 'Predicted modal price (₹/quintal)',
+        data: forecastValues,
+        borderColor: '#4f6bed',
+        backgroundColor: 'rgba(79,107,237,.12)',
+        fill: true, tension: .35, pointRadius: 3, borderWidth: 2
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: 'top', align: 'end' } },
+        scales: { y: { beginAtZero: false, grid: { color: '#edf0f6' } }, x: { grid: { display: false } } }
+      }
+    });
+  </script>
+  {% endif %}
+</body>
+</html>

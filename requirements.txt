@@ -1,0 +1,5 @@
+flask
+pandas
+numpy
+scikit-learn   # use the SAME version you trained model.pkl with
+joblib
